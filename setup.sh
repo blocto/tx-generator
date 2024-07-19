@@ -8,6 +8,6 @@ fi
 source .venv/bin/activate
 
 pip install -r requirements.txt -q
-poetry install
+poetry install --no-root
 
 python case/downloader.py
