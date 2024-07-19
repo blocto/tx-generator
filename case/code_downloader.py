@@ -43,6 +43,7 @@ class CaseDownloader:
     def _download_file(self, file_info: dict, path: str) -> None:
         """Download a single file from the repository."""
         content_encoded = file_info["content"]
+        print(content_encoded)
         file_content = base64.b64decode(content_encoded)
 
         local_path = os.path.join(self.output_dir, path)
