@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "tx-generator"
+version = "0.1.0"
+description = ""
+authors = ["clement.l <maple3312936@outlook.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
