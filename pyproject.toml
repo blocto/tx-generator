@@ -6,6 +6,8 @@ authors = ["clement.l <maple3312936@outlook.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
+langchain = "^0.2.9"
+langchain-community = "^0.2.7"
 python = "^3.11"
 python-dotenv = "^1.0.1"
 tqdm = "^4.66.4"
