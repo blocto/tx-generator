@@ -7,10 +7,14 @@ from langchain_core.documents import Document
 
 
 class CaseCodeLoader(BaseLoader):
-    def _extract_protocol_name(self, file_path: str) -> str:
+    """
+    Loads code snippets from the batch case codebase.
+    """
+
+    def _extract_case_name(self, file_path: str) -> tuple[str, str]:
         path_components = file_path.split(os.sep)
         case_index = path_components.index("cases")
-        return path_components[case_index + 1]
+        return path_components[case_index + 1], path_components[-1]
 
     def load(self) -> List[Document]:
         """Load data into Document objects."""
@@ -23,9 +27,10 @@ class CaseCodeLoader(BaseLoader):
             if os.path.isfile(file_path):
                 with open(file_path, "r") as file:
                     content = file.read()
+                    case_name, file_name = self._extract_case_name(file_path)
                     yield Document(
                         page_content=content,
-                        metadata={"protocol": self._extract_protocol_name(file_path)},
+                        metadata={"case": case_name, "file": file_name},
                     )
 
 
