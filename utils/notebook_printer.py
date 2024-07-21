@@ -1,4 +1,5 @@
-from IPython.display import display, Markdown, update_display
+from IPython.display import display, Markdown, Image, update_display
+from langgraph.graph.graph import CompiledGraph
 
 from langchain_core.messages import HumanMessage
 
@@ -48,3 +49,10 @@ class NotebookPrinter:
                 docs = output["documents"]
                 print(f"Retrieved documents: {[doc.metadata for doc in docs]}")
                 print("--")
+
+    def print_graph(self, graph: CompiledGraph):
+        try:
+            display(Image(graph.get_graph().draw_mermaid_png()))
+        except Exception:
+            # This requires some extra dependencies and is optional
+            pass
