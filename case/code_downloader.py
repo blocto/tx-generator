@@ -67,6 +67,13 @@ class CaseDownloader:
         case_paths = self._get_case_path()
         base_url = f"{self.github_api_url}/repos/{self.repo}/contents"
 
+        # Check if output directory exists
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+        # Download metadata
+        self._download_meta()
+
         # Download all cases
         for path in tqdm(case_paths, desc="Downloading files", unit="file"):
             local_dir = os.path.dirname(os.path.join(self.output_dir, path))
@@ -77,9 +84,6 @@ class CaseDownloader:
             response.raise_for_status()
             file_info = response.json()
             self._download_file(file_info, path)
-
-        # Download metadata
-        self._download_meta()
 
 
 if __name__ == "__main__":
