@@ -11,6 +11,22 @@ class CaseCodeLoader(BaseLoader):
     Loads code snippets from the batch case codebase.
     """
 
+    def _get_cases(self):
+        import json
+
+        with open("raw_data/meta.json", "r") as f:
+            cases = json.load(f)
+            # Transform the list of dictionaries into the desired dictionary format
+
+        transformed_data = {
+            case["id"]: {
+                "chain_id": case["chain_id"],
+                "preview_txn_count": case["preview_txn_count"],
+            }
+            for case in cases
+        }
+        return transformed_data
+
     def _extract_case_name(self, file_path: str) -> tuple[str, str]:
         path_components = file_path.split(os.sep)
         case_index = path_components.index("cases")
@@ -21,8 +37,8 @@ class CaseCodeLoader(BaseLoader):
         return list(self.lazy_load())
 
     def lazy_load(self) -> Iterator[Document]:
-        directory_path = "raw_data/cases"
-        file_pattern = os.path.join(directory_path, "**", "*")
+        case_dir_path = "raw_data/cases"
+        file_pattern = os.path.join(case_dir_path, "**", "*")
         for file_path in glob.iglob(file_pattern, recursive=True):
             if os.path.isfile(file_path):
                 with open(file_path, "r") as file:
