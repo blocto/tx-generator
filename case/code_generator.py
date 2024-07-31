@@ -1,18 +1,15 @@
+import os
+import json
+import time
+from tqdm.asyncio import tqdm_asyncio
+from langchain_core.document_loaders import BaseLoader
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
-
 from langchain.tools.retriever import create_retriever_tool
 
-import os
-import json
-import numpy as np
-from tqdm import tqdm
-
-
 from case.code_retriever import get_retriever
-from case.code_loader import CaseCodeLoader
-from utils.model_selector import get_chat_model
+from utils.model_selector import ModelType, get_chat_model
 
 
 def _create_retrieval_tool():
@@ -34,6 +31,7 @@ class Tx(BaseModel):
 class Case(BaseModel):
     case_id: str = Field(description="Unique identifier for the case.")
     description: str = Field(description="A brief description of the case.")
+    total_steps: int = Field(description="The total transaction count of the case.")
     steps: list[Tx] = Field(description="Each step represents a transaction.")
 
 
@@ -43,6 +41,11 @@ class CaseOutput(BaseModel):
     )
 
 
+class SkippedFile(BaseModel):
+    file_name: str = Field(description="Name of the file that was skipped.")
+    error: str = Field(description="Error message that caused the file to be skipped.")
+
+
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
@@ -50,8 +53,8 @@ def format_docs(docs):
 retriever = get_retriever()
 
 
-def generate(model_name: str = "gpt-4o"):
-    model = get_chat_model(model_name)
+def generate(model_type: ModelType):
+    model = get_chat_model(model_type)
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -82,47 +85,63 @@ def generate(model_name: str = "gpt-4o"):
     return chain
 
 
-def transform_case(model_name: str = "gpt-4o"):
-    model = get_chat_model(model_name)
-    loader = CaseCodeLoader()
-
+async def transform_case(total_files: int, loader: BaseLoader, model_type: ModelType):
+    model = get_chat_model(model_type)
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                "You are a blockchain expert. Create a structured output from the given code snippets.",
+                """
+                You are a blockchain expert with extensive knowledge in TypeScript and blockchain transactions. 
+                Your task is to assist the user by following these specific guidelines.\n\n
+                RULES:\n
+                1. Use the user-provided code snippets to create a structured output.\n
+                2. The steps are typically detailed in the `previewTx` field.\n
+                3. Ensure that the number of steps in the `previewTx` matches the number specified in the `txn_count`.\n
+                \n\n
+                Follow these rules to provide accurate responses.
+                """,
             ),
-            (
-                "human",
-                "Transform the provided code below to a structured format. \n\n{code}.",
-            ),
+            ("human", "{code}"),
         ]
     )
     chain = (
         {"code": RunnablePassthrough()} | prompt | model.with_structured_output(Case)
     )
 
-    output_path = f"data/case_outputs_{model_name}.jsonl"
+    output_path = f"case/data/case_outputs_{model_type.value}.jsonl"
+
     # Check if the file exists, and delete it if it does
     if os.path.exists(output_path):
         os.remove(output_path)
 
-    for doc in tqdm(
-        loader.lazy_load(), desc="Processing Documents", unit="doc", total=116
+    skipped_files: list[SkippedFile] = []
+    duration_list = []
+
+    async for doc in tqdm_asyncio(
+        loader.alazy_load(),
+        desc="Processing Documents",
+        unit="doc",
+        total=total_files,
     ):
         metadata = doc.metadata
+        meta_str = f"{metadata['case']}/{metadata['file']}"
         # Skip documents that do not match the criteria
-        if (
-            "PartialBatchCase" not in doc.page_content
-            or metadata["case"] in ["prebuilt-tx"]
-            # or metadata["file"] in ["gauntlet-weth-prime.ts"]
-        ):
+        if "PartialBatchCase" not in doc.page_content:
+            skipped_files.append(
+                SkippedFile(file_name=meta_str, error="No case found.")
+            )
             continue
 
-        # print(f"#{index}: {metadata['case']}/{metadata['file']}")
-        # print("-------------------")
         try:
-            result = chain.invoke(doc.page_content)
+            start_time = time.time()
+
+            result = await chain.ainvoke(doc.page_content)
+
+            end_time = time.time()
+
+            duration_list.append(end_time - start_time)
+
             # Ensure the directory exists
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
@@ -131,7 +150,11 @@ def transform_case(model_name: str = "gpt-4o"):
                 f.write(json.dumps(result.dict()))
                 f.write("\n")
         except Exception as e:
-            tqdm.write(f"Error processing {metadata['case']}/{metadata['file']}")
+            skipped_files.append(
+                SkippedFile(file_name=meta_str, error="Unable to process document.")
+            )
+
+    return skipped_files
 
 
 def get_cases():
