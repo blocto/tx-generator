@@ -1,10 +1,11 @@
-from enum import Enum
+from functools import lru_cache
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_vertexai import ChatVertexAI
 
 
+@lru_cache(maxsize=4)
 def get_chat_model(provider: str = "openai", temperature: float = 0.7) -> BaseChatModel:
     normalized_provider = provider.strip().lower()
     chat_models = {
