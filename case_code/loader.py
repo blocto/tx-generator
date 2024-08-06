@@ -6,7 +6,7 @@ from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 
 
-class CaseCodeLoader(BaseLoader):
+class CodeLoader(BaseLoader):
     """
     Loads code snippets from the batch case codebase.
     """
@@ -50,8 +50,8 @@ class CaseCodeLoader(BaseLoader):
                     )
 
 
-async def async_case_loader():
-    loader = CaseCodeLoader()
+async def async_code_loader():
+    loader = CodeLoader()
     async for doc in loader.alazy_load():
         print()
         print(type(doc))
@@ -59,6 +59,5 @@ async def async_case_loader():
 
 
 if __name__ == "__main__":
-    loader = CaseCodeLoader()
-
-    asyncio.run(async_case_loader())
+    loader = CodeLoader()
+    asyncio.run(async_code_loader())

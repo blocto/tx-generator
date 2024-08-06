@@ -1,11 +1,12 @@
-import base64
-from dotenv import load_dotenv
 import os
 import requests
+import json
+import base64
+from dotenv import load_dotenv
 from tqdm import tqdm
 
 
-class CaseDownloader:
+class CodeDownloader:
     def __init__(self, is_dev: bool = True, output_dir: str = "raw_data/"):
         load_dotenv()
         self.is_dev: bool = is_dev
@@ -22,7 +23,7 @@ class CaseDownloader:
             "Authorization": f"Bearer {self.access_token}",
         }
 
-    def _get_case_path(self) -> str:
+    def _get_case_path(self) -> list[str]:
         """Get all case paths from the repository."""
         base_url = (
             f"{self.github_api_url}/repos/{self.repo}/git/trees/"
@@ -62,7 +63,7 @@ class CaseDownloader:
         with open(os.path.join(self.output_dir, "meta.json"), "w") as f:
             json.dump(cases_sorted, f)
 
-    def download(self) -> None:
+    def download(self) -> int:
         """Download all bento cases from the repository."""
         case_paths = self._get_case_path()
         base_url = f"{self.github_api_url}/repos/{self.repo}/contents"
@@ -78,14 +79,30 @@ class CaseDownloader:
         for path in tqdm(case_paths, desc="Downloading files", unit="file"):
             local_dir = os.path.dirname(os.path.join(self.output_dir, path))
             os.makedirs(local_dir, exist_ok=True)
-
             url = f"{base_url}/{path}"
             response = requests.get(url, headers=self.headers)
             response.raise_for_status()
             file_info = response.json()
             self._download_file(file_info, path)
+        return len(case_paths)
+
+
+def get_metadata():
+    with open("raw_data/meta.json", "r") as f:
+        cases = json.load(f)
+
+    metadata = {
+        case["id"]: {
+            "chain_id": case["chain_id"],
+            "preview_txn_count": case["preview_txn_count"],
+        }
+        for case in cases
+    }
+    return metadata
 
 
 if __name__ == "__main__":
-    downloader = CaseDownloader(is_dev=True)
+    downloader = CodeDownloader(is_dev=True)
     downloader.download()
+
+    print(f"Case amount in metadata: {len(get_metadata())}")

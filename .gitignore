@@ -6,8 +6,8 @@ __pycache__/
 # Include the source code
 raw_data/
 
+# Data for RAG
+data/
+
 # For Google Vertex AI
 google-credentials.json
-
-# Case data for RAG
-case/data/
