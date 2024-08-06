@@ -1,11 +1,13 @@
 import os
 import json
-import time
 from enum import Enum
+from typing import List, Dict
+from io import TextIOWrapper
 from tqdm.asyncio import tqdm_asyncio
+from langchain_core.documents import Document
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, Runnable
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.language_models import BaseChatModel
 from utils.model_selector import get_chat_model
@@ -16,7 +18,9 @@ class Tx(BaseModel):
     to: str = Field(description="The receiving address of the transaction.")
     value: str = Field(description="The amount of native token to transfer.")
     function_name: str = Field(description="Function name of the transaction.")
-    input_args: list[str] = Field(description="Input arguments of the function.")
+    input_args: list[str] = Field(
+        description="Input arguments of the function. If the value is not determined, use `{user_input}`."
+    )
 
 
 class Case(BaseModel):
@@ -37,13 +41,35 @@ class TransformError(Enum):
     ParseError = "Parse Error"
 
 
+async def process_document(
+    doc: Document,
+    chain: Runnable,
+    output_path: str,
+    skipped_files: Dict[TransformError, List[str]],
+):
+    metadata = doc.metadata
+    meta_str = f"{metadata['case']}/{metadata['file']}"
+    # Skip documents that do not match the criteria
+    if "PartialBatchCase" not in doc.page_content:
+        skipped_files[TransformError.NotFoundError].append(meta_str)
+        return
+    try:
+        result = await chain.ainvoke(doc.page_content)
+        with open(output_path, "a") as f:
+            f.write(json.dumps(result.dict()) + "\n")
+    except Exception:
+        skipped_files[TransformError.ParseError].append(meta_str)
+
+
 async def transform(
     loader: BaseLoader,
     model: BaseChatModel,
     total: int | None = None,
     output_dir: str = "data",
-) -> dict[TransformError, list[str]]:
+) -> Dict[TransformError, List[str]]:
     output_path = f"{output_dir}/case_{model.model_name}.jsonl"
+    # Ensure the output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -71,33 +97,12 @@ async def transform(
     if os.path.exists(output_path):
         os.remove(output_path)
 
-    skipped_files: dict[str, list[str]] = {}  # skipped_reason : [file_name]
-    duration_list = []
+    skipped_files: Dict[TransformError, List[str]] = {
+        TransformError.NotFoundError: [],
+        TransformError.ParseError: [],
+    }
 
-    async for doc in tqdm_asyncio(
-        loader.alazy_load(), desc="Processing Documents", unit="doc", total=total
-    ):
-        metadata = doc.metadata
-        meta_str = f"{metadata['case']}/{metadata['file']}"
-        # Skip documents that do not match the criteria
-        if "PartialBatchCase" not in doc.page_content:
-            skipped_files[TransformError.NotFoundError] = meta_str
-            continue
+    async for doc in tqdm_asyncio(loader.alazy_load(), desc="Processing", total=total):
+        await process_document(doc, chain, output_path, skipped_files)
 
-        try:
-            start_time = time.time()
-
-            result = await chain.ainvoke(doc.page_content)
-
-            end_time = time.time()
-
-            duration_list.append(end_time - start_time)
-
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-            with open(output_path, "a") as f:
-                f.write(json.dumps(result.dict()))
-                f.write("\n")
-        except Exception as e:
-            skipped_files[TransformError.ParseError] = meta_str
     return skipped_files

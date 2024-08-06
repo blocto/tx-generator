@@ -9,7 +9,7 @@ def get_chat_model(provider: str = "openai", temperature: float = 0.7) -> BaseCh
     normalized_provider = provider.strip().lower()
     chat_models = {
         "openai": ChatOpenAI(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             temperature=temperature,
         ),
         "anthropic": ChatAnthropic(

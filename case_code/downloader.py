@@ -4,6 +4,7 @@ import json
 import base64
 from dotenv import load_dotenv
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class CodeDownloader:
@@ -48,6 +49,15 @@ class CodeDownloader:
         with open(os.path.join(self.output_dir, path), "wb") as f:
             f.write(file_content)
 
+    def _download_single_case(self, path, base_url):
+        local_dir = os.path.dirname(os.path.join(self.output_dir, path))
+        os.makedirs(local_dir, exist_ok=True)
+        url = f"{base_url}/{path}"
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        file_info = response.json()
+        self._download_file(file_info, path)
+
     def _download_meta(self):
         """Download the metadata file from the repository."""
         import json
@@ -75,15 +85,23 @@ class CodeDownloader:
         # Download metadata
         self._download_meta()
 
-        # Download all cases
-        for path in tqdm(case_paths, desc="Downloading files", unit="file"):
-            local_dir = os.path.dirname(os.path.join(self.output_dir, path))
-            os.makedirs(local_dir, exist_ok=True)
-            url = f"{base_url}/{path}"
-            response = requests.get(url, headers=self.headers)
-            response.raise_for_status()
-            file_info = response.json()
-            self._download_file(file_info, path)
+        # Use a session for requests
+        with requests.Session() as session:
+            session.headers.update(self.headers)
+            futures = []
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                for path in case_paths:
+                    futures.append(
+                        executor.submit(self._download_single_case, path, base_url)
+                    )
+                for future in tqdm(
+                    as_completed(futures),
+                    total=len(case_paths),
+                    desc="Downloading files",
+                    unit="file",
+                ):
+                    future.result()
+
         return len(case_paths)
 
 
