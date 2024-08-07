@@ -1,13 +1,15 @@
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
-import case_loader
+from case.case_loader import get_case_doc_loader
+
+file_path = "data/case_gpt-4o.jsonl"
+loader = get_case_doc_loader(file_path)
+docs = loader.load()
+embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
+db = Chroma.from_documents(documents=docs, embedding=embedding_model)
 
 
-def get_retriever(file_path: str):
-    loader = case_loader.get_case_doc_loader(file_path)
-    docs = loader.load()
-    embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
-    db = Chroma.from_documents(documents=docs, embedding=embedding_model)
+def get_retriever():
     return db.as_retriever()
 
 
