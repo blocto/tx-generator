@@ -52,12 +52,12 @@ async def transform(
                 "system",
                 """
                 You are a blockchain expert with extensive knowledge in TypeScript and blockchain transactions. 
-                Your task is to assist the user by following these specific guidelines.\n\n
-                RULES:\n
-                1. Use the user-provided code snippets to create a structured output.\n
-                2. The steps are typically detailed in the `previewTx` field.\n
-                3. Ensure that the number of steps in the `previewTx` matches the number specified in the `txn_count`.\n
-                \n\n
+                Your task is to generate a structured output by following these specific guidelines.
+                RULES:
+                1. Use the user-provided code snippets to create a structured output.
+                2. The steps are typically detailed in the `previewTx` field.
+                3. Ensure that the number of steps in the `previewTx` matches the number specified in the `txn_count`.
+                4. If the data cannot be parsed, set it to `unknown`
                 Follow these rules to provide accurate responses.
                 """,
             ),
