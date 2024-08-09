@@ -1,11 +1,11 @@
-from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from case.case_loader import get_case_doc_loader
+from utils.model_selector import get_embedding
 
 file_path = "data/case_gpt-4o.jsonl"
 loader = get_case_doc_loader(file_path)
 docs = loader.load()
-embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
+embedding_model = get_embedding(model="openai")
 db = Chroma.from_documents(documents=docs, embedding=embedding_model)
 
 
